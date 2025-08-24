@@ -51,62 +51,33 @@ jobs:
       - name: 🚀 Start Practice Software Testing App
         run: |
           echo "🚀 Starting Practice Software Testing application..."
-          # Set environment variables
-          export SPRINT=sprint5
+          # Follow exact same pattern as original workflow
           export DISABLE_LOGGING=true
-          # Use the existing docker-compose setup
           docker compose -f docker-compose.yml up -d --force-recreate
 
       - name: ⏱️ Wait for Services
         run: |
           echo "⏱️ Waiting for services to be ready..."
-          echo "Initial wait for containers to start..."
-          sleep 60
-
-          echo "🐳 Checking container status..."
-          docker compose ps
-
-          echo "📋 Container logs (last 50 lines):"
-          docker compose logs --tail=50
-
-          echo "Additional wait for services to fully initialize..."
-          sleep 60
+          sleep 60s
+        shell: bash
 
       - name: 🌱 Setup Database
         run: |
           echo "🌱 Setting up database with seed data..."
-          export SPRINT=sprint5
-          export DISABLE_LOGGING=true
           docker compose exec -T laravel-api php artisan migrate:refresh --seed
 
       - name: 🔍 Health Check
         run: |
           echo "🔍 Performing health check..."
-          echo "Testing multiple endpoints to find the correct one..."
+          # Copy exact same pattern from original workflow
+          curl -v -X GET 'http://localhost:8091/status'
 
-          # Test root endpoint
-          echo "Testing /"
-          curl -f -s -X GET 'http://localhost:8091/' && echo "✅ Root endpoint works" || echo "❌ Root failed"
-
-          # Test common health endpoints
-          echo "Testing /health"
-          curl -f -s -X GET 'http://localhost:8091/health' && echo "✅ /health works" || echo "❌ /health failed"
-
-          echo "Testing /status"
-          curl -f -s -X GET 'http://localhost:8091/status' && echo "✅ /status works" || echo "❌ /status failed"
-
-          # Test API endpoints that will be used in tests
-          echo "Testing /api/users/login"
-          curl -f -s -X POST 'http://localhost:8091/api/users/login' \
-            -H 'Content-Type: application/json' \
-            -d '{}' && echo "✅ Login endpoint accessible" || echo "❌ Login endpoint failed"
-
-          # Show what's actually running
-          echo "🐳 Docker containers status:"
-          docker compose ps
-
-          echo "📡 Network connections:"
-          netstat -an | grep :8091 || echo "Port 8091 not found"
+      - name: 🔐 Test Login Endpoint
+        run: |
+          echo "🔐 Testing login endpoint..."
+          curl -v -X POST 'http://localhost:8091/users/login' \
+          -H 'Content-Type: application/json' \
+          -d '{"email": "admin@practicesoftwaretesting.com", "password": "welcome01"}'
 
       - name: 📋 Display Environment Info
         run: |
