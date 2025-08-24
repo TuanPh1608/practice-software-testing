@@ -60,7 +60,7 @@ jobs:
       - name: ⏱️ Wait for Services
         run: |
           echo "⏱️ Waiting for services to be ready..."
-          sleep 90
+          sleep 120
 
       - name: 🌱 Setup Database
         run: |
@@ -72,12 +72,25 @@ jobs:
       - name: 🔍 Health Check
         run: |
           echo "🔍 Performing health check..."
-          curl -v -X GET 'http://localhost:8091/status' || echo "API health check failed"
+          # Check if web server is responding
+          curl -v http://localhost:8091 || echo "Web server check failed"
+          # Check if API is responding
+          curl -v http://localhost:8091/api || echo "API endpoint check failed"
+          # Wait a bit more for API to be fully ready
+          sleep 30
 
       - name: 📋 Display Environment Info
         run: |
           echo "📋 Environment Information:"
           echo "API URL: http://localhost:8091"
+          echo "🔍 Testing API endpoints..."
+          # Test if login endpoint is accessible
+          curl -X POST http://localhost:8091/users/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@practicesoftwaretesting.com","password":"welcome01"}' \
+            --max-time 30 || echo "Login endpoint test failed (expected for security)"
+          echo "📊 Container status:"
+          docker compose ps
           echo "App URL: http://localhost:8080"
           echo "Docker containers:"
           docker ps
