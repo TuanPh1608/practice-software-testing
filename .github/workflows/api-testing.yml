@@ -81,12 +81,12 @@ jobs:
       - name: 🔐 Test Login
         run: |
           echo "🔐 Testing login endpoint with different users..."
-          
+
           echo "Testing with customer account:"
           curl -v -X POST 'http://localhost:8091/users/login' \
           -H 'Content-Type: application/json' \
           -d '{"email": "customer@practicesoftwaretesting.com", "password": "welcome01"}' || echo "Customer login failed"
-          
+
           echo -e "\nTesting with admin account:"
           curl -v -X POST 'http://localhost:8091/users/login' \
           -H 'Content-Type: application/json' \
@@ -104,28 +104,10 @@ jobs:
       - name: 📁 Create Reports Directory
         run: mkdir -p reports
 
-      - name: 🔐 Run Authentication API Tests
+      - name: 🧪 Run All API Tests
         run: |
-          echo "🔐 Running Authentication API Tests..."
-          npm run api:test:auth
-        continue-on-error: true
-
-      - name: 🏷️ Run Brands Search API Tests
-        run: |
-          echo "🏷️ Running Brands Search API Tests..."
-          npm run api:test:brands
-        continue-on-error: true
-
-      - name: 📂 Run Categories Search API Tests
-        run: |
-          echo "📂 Running Categories Search API Tests..."
-          npm run api:test:categories
-        continue-on-error: true
-
-      - name: 📋 Run Invoice Status API Tests
-        run: |
-          echo "📋 Running Invoice Status API Tests..."
-          npm run api:test:invoices
+          echo "🧪 Running all API tests in sequence..."
+          npm run api:test:all
         continue-on-error: true
 
       - name: 📊 List Generated Reports

@@ -1211,7 +1211,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/brands/search?q=q=makita)(&(brand=*))",
+							"raw": "{{base_url}}/brands/search?q=makita",
 							"host": [
 								"{{base_url}}"
 							],
@@ -1222,11 +1222,7 @@
 							"query": [
 								{
 									"key": "q",
-									"value": "q=makita)("
-								},
-								{
-									"key": "(brand",
-									"value": "*))"
+									"value": "makita"
 								}
 							]
 						}
