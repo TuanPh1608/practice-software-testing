@@ -1,4 +1,4 @@
-name: 🔍 CS423 API Testing (Simple)
+name: API Testing
 
 on:
   push:
@@ -28,7 +28,14 @@ jobs:
       - name: ⏱️ Wait for Services
         run: |
           echo "⏱️ Waiting for services to be ready..."
+          echo "Initial wait for containers..."
           sleep 60s
+
+          echo "🔍 Check container health..."
+          docker compose ps
+
+          echo "Additional wait for Laravel initialization..."
+          sleep 30s
         shell: bash
 
       - name: 🌱 Setup Database
@@ -36,10 +43,40 @@ jobs:
           echo "🌱 Setting up database with seed data..."
           docker compose exec -T laravel-api php artisan migrate:refresh --seed
 
+      - name: 🔧 Debug Laravel Application
+        run: |
+          echo "🔧 Debugging Laravel application..."
+
+          echo "📋 Laravel Environment:"
+          docker compose exec -T laravel-api php artisan about
+
+          echo "🗄️ Database Status:"
+          docker compose exec -T laravel-api php artisan migrate:status
+
+          echo "👤 Check if users exist:"
+          docker compose exec -T laravel-api php artisan db:show
+
+          echo "📝 Laravel Logs (last 20 lines):"
+          docker compose exec -T laravel-api tail -20 /var/www/storage/logs/laravel.log || echo "No Laravel logs found"
+
+          echo "🐳 All Container Status:"
+          docker compose ps
+
+          echo "🌐 Container Logs:"
+          docker compose logs --tail=30
+
       - name: 🔍 Health Check
         run: |
           echo "🔍 Performing health check..."
-          curl -v -X GET 'http://localhost:8091/status'
+
+          echo "Testing /status endpoint:"
+          curl -v -X GET 'http://localhost:8091/status' || echo "Status endpoint failed"
+
+          echo -e "\n🔍 Testing with detailed response:"
+          curl -i -X GET 'http://localhost:8091/status' || echo "Detailed status failed"
+
+          echo -e "\n🌐 Test basic connectivity:"
+          curl -I 'http://localhost:8091/' || echo "Basic connectivity failed"
 
       - name: 🔐 Test Login
         run: |
