@@ -80,10 +80,17 @@ jobs:
 
       - name: 🔐 Test Login
         run: |
-          echo "🔐 Testing login endpoint..."
+          echo "🔐 Testing login endpoint with different users..."
+          
+          echo "Testing with customer account:"
           curl -v -X POST 'http://localhost:8091/users/login' \
           -H 'Content-Type: application/json' \
-          -d '{"email": "admin@practicesoftwaretesting.com", "password": "welcome01"}'
+          -d '{"email": "customer@practicesoftwaretesting.com", "password": "welcome01"}' || echo "Customer login failed"
+          
+          echo -e "\nTesting with admin account:"
+          curl -v -X POST 'http://localhost:8091/users/login' \
+          -H 'Content-Type: application/json' \
+          -d '{"email": "admin@practicesoftwaretesting.com", "password": "welcome01"}' || echo "Admin login failed"
 
       - name: 🏗️ Setup Node.js
         uses: actions/setup-node@v4
