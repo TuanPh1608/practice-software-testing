@@ -1,8 +1,8 @@
-name: 🔍 CS423 API Testing
+name: API Testing
 
 on:
   push:
-    branches: [main, hw7-api-testing]
+    branches: ["**"] # Run on all branches for testing
   pull_request:
     branches: [main]
   workflow_dispatch:
