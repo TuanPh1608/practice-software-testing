@@ -120,6 +120,23 @@ jobs:
       - name: 📁 Create Reports Directory
         run: mkdir -p reports
 
+      - name: 🐛 Debug API Endpoints Before Testing
+        run: |
+          echo "🐛 Testing specific API endpoints that are failing..."
+          
+          echo "🔍 Testing /brands/search endpoint:"
+          curl -v -X GET 'http://localhost:8091/brands/search?q=test' || echo "Brands search failed"
+          
+          echo -e "\n🔍 Testing /categories/search endpoint:"
+          curl -v -X GET 'http://localhost:8091/categories/search?q=tool' || echo "Categories search failed"
+          
+          echo -e "\n📋 Laravel Error Logs:"
+          docker compose exec -T laravel-api tail -50 /var/www/storage/logs/laravel.log || echo "No error logs found"
+          
+          echo -e "\n🗂️ Check Laravel routes:"
+          docker compose exec -T laravel-api php artisan route:list | grep -E "(brands|categories)" || echo "Routes not found"
+        continue-on-error: true
+
       - name: 🔐 Run Authentication API Tests
         run: |
           echo "🔐 Running Authentication API Tests..."
