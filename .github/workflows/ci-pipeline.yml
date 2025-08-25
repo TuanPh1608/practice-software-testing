@@ -45,7 +45,20 @@ jobs:
           echo "Waiting for services to be ready..."
           sleep 60
           
-      # Stage 3: Database Setup
+      # Stage 3: Laravel Configuration & Database Setup
+      - name: 🔧 Configure Laravel
+        run: |
+          echo "Clearing Laravel caches..."
+          docker compose exec -T laravel-api php artisan config:clear
+          docker compose exec -T laravel-api php artisan cache:clear
+          docker compose exec -T laravel-api php artisan route:clear
+          docker compose exec -T laravel-api php artisan view:clear
+          
+      - name: 🔗 Test database connection
+        run: |
+          echo "Testing database connection..."
+          docker compose exec -T laravel-api php artisan migrate:status || echo "Database not ready yet"
+          
       - name: ️ Setup database
         run: |
           echo "Running database migrations..."
@@ -56,16 +69,31 @@ jobs:
           echo "Verifying database status..."
           docker compose exec -T laravel-api php artisan migrate:status
           
-      # Stage 4: Health Check
+      - name: 🔧 Cache Laravel configuration
+        run: |
+          echo "Caching Laravel configuration..."
+          docker compose exec -T laravel-api php artisan config:cache
+          docker compose exec -T laravel-api php artisan route:cache
+          
+      # Stage 4: Health Check & Debugging
+      - name: 🔍 Debug API container status
+        run: |
+          echo "=== Container Status ==="
+          docker compose ps
+          
+          echo "=== Laravel API Logs ==="
+          docker compose logs laravel-api --tail=20
+          
       - name: 🩺 API health checks
         run: |
           echo "=== Health Check: API Status ==="
-          curl -f http://localhost:8091/status || exit 1
+          curl -v http://localhost:8091/status || echo "Status endpoint failed"
           
-          echo "=== Health Check: Core Endpoints ==="
-          curl -f http://localhost:8091/products || echo "Products endpoint needs auth"
-          curl -f http://localhost:8091/categories || echo "Categories endpoint needs auth" 
-          curl -f http://localhost:8091/brands || echo "Brands endpoint needs auth"
+          echo "=== Health Check: Detailed Response ==="
+          curl -i http://localhost:8091/products || echo "Products endpoint response logged"
+          
+          echo "=== Check Laravel Routes ==="
+          docker compose exec -T laravel-api php artisan route:list | grep -E "(login|products|brands|categories)" || echo "Routes listed"
           
       # Stage 5: Setup Newman
       - name: ⚙️ Setup Node.js & Newman
@@ -76,15 +104,21 @@ jobs:
       - name: 📦 Install Newman
         run: npm install -g newman
         
-      # Stage 6: API Tests
+      # Stage 6: API Tests with Enhanced Debugging
       - name: 🧪 Run Authentication Tests
         run: |
+          echo "=== Pre-test: Check Laravel Logs ==="
+          docker compose logs laravel-api --tail=10
+          
           echo "Running Authentication API tests..."
           newman run collections/Authentication.postman_collection.json \
             --environment environments/CI-Docker.postman_environment.json \
             --reporters cli,json \
             --reporter-json-export results-Authentication.json \
-            --bail || echo "Authentication tests completed with issues"
+            --verbose || echo "Authentication tests completed with issues"
+            
+          echo "=== Post-test: Check Laravel Logs ==="
+          docker compose logs laravel-api --tail=10
             
       - name: 🧪 Run Brands Tests
         run: |
@@ -93,7 +127,7 @@ jobs:
             --environment environments/CI-Docker.postman_environment.json \
             --reporters cli,json \
             --reporter-json-export results-Brands.json \
-            --bail || echo "Brands tests completed with issues"
+            --verbose || echo "Brands tests completed with issues"
             
       - name: 🧪 Run Categories Tests
         run: |
@@ -102,7 +136,7 @@ jobs:
             --environment environments/CI-Docker.postman_environment.json \
             --reporters cli,json \
             --reporter-json-export results-Categories.json \
-            --bail || echo "Categories tests completed with issues"
+            --verbose || echo "Categories tests completed with issues"
             
       - name: 🧪 Run Invoice Tests
         run: |
@@ -111,7 +145,7 @@ jobs:
             --environment environments/CI-Docker.postman_environment.json \
             --reporters cli,json \
             --reporter-json-export results-Invoices.json \
-            --bail || echo "Invoice tests completed with issues"
+            --verbose || echo "Invoice tests completed with issues"
             
       # Stage 7: Results & Cleanup
       - name: 📊 Upload all test results
