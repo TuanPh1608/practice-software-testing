@@ -9,6 +9,8 @@ on:
 
 env:
   NODE_VERSION: "18"
+  SPRINT: "sprint5"
+  DISABLE_LOGGING: "true"
 
 jobs:
   api-testing:
@@ -22,8 +24,17 @@ jobs:
       - name: 🐳 Start Application
         run: |
           echo "🚀 Starting Practice Software Testing application..."
-          export DISABLE_LOGGING=true
           docker compose -f docker-compose.yml up -d --force-recreate
+          
+          echo "⏳ Waiting for composer to install dependencies..."
+          # Wait for composer to finish
+          while docker compose ps composer | grep -q "running\|Up"; do
+            echo "Composer still installing dependencies..."
+            sleep 10
+          done
+          
+          echo "✅ Composer finished installing dependencies"
+          docker compose ps
 
       - name: ⏱️ Wait for Services  
         run: |
