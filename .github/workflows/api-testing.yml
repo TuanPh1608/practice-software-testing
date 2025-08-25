@@ -9,7 +9,7 @@ on:
 
 env:
   NODE_VERSION: "18"
-  SPRINT: "sprint5"
+  SPRINT: "sprint5-with-bugs"
   DISABLE_LOGGING: "true"
 
 jobs:
