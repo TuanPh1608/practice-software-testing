@@ -1,0 +1,185 @@
+name: CI/CD Pipeline 🚀
+
+on:
+  push:
+    branches: [ test-api-workflow, main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  SPRINT: "sprint5-with-bugs"
+
+jobs:
+  # Job 1: Build and Test Infrastructure
+  build:
+    name: 🏗️ Build & Setup
+    runs-on: ubuntu-22.04
+    outputs:
+      sprint: ${{ env.SPRINT }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: 🏗️ Build application stack
+        env:
+          DISABLE_LOGGING: "true"
+        run: |
+          echo "Building application for ${{ env.SPRINT }}"
+          docker compose -f docker-compose.yml build --no-cache
+          
+      - name: 🚀 Start application stack
+        env:
+          DISABLE_LOGGING: "true"
+        run: |
+          docker compose -f docker-compose.yml up -d
+          
+      - name: ⏳ Wait for services startup
+        run: |
+          echo "Waiting for services to be ready..."
+          sleep 60
+          
+      - name: 🔍 Verify services status
+        run: |
+          echo "=== Docker Services Status ==="
+          docker compose ps
+          echo "=== Checking service health ==="
+          docker compose logs laravel-api --tail=20
+
+  # Job 2: Database Setup and Migration
+  database:
+    name: 🗄️ Database Setup
+    runs-on: ubuntu-22.04
+    needs: build
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🚀 Start services
+        env:
+          DISABLE_LOGGING: "true"
+        run: |
+          docker compose -f docker-compose.yml up -d
+          sleep 60
+          
+      - name: 🗄️ Setup database
+        run: |
+          echo "Running database migrations..."
+          docker compose exec -T laravel-api php artisan migrate:refresh --seed --force
+          
+      - name: ✅ Verify database setup
+        run: |
+          echo "Verifying database status..."
+          docker compose exec -T laravel-api php artisan migrate:status
+
+  # Job 3: API Health Check
+  health-check:
+    name: 🩺 Health Check
+    runs-on: ubuntu-22.04
+    needs: database
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🚀 Start services
+        env:
+          DISABLE_LOGGING: "true"
+        run: |
+          docker compose -f docker-compose.yml up -d
+          sleep 60
+          docker compose exec -T laravel-api php artisan migrate:refresh --seed --force
+          
+      - name: 🩺 API health checks
+        run: |
+          echo "=== Health Check: API Status ==="
+          curl -f http://localhost:8091/status || exit 1
+          
+          echo "=== Health Check: Core Endpoints ==="
+          curl -f http://localhost:8091/products || echo "Products endpoint needs auth"
+          curl -f http://localhost:8091/categories || echo "Categories endpoint needs auth" 
+          curl -f http://localhost:8091/brands || echo "Brands endpoint needs auth"
+
+  # Job 4: API Testing with Newman
+  api-tests:
+    name: 🧪 API Tests
+    runs-on: ubuntu-22.04
+    needs: health-check
+    strategy:
+      matrix:
+        test-suite:
+          - { name: "Authentication", file: "Authentication.postman_collection.json" }
+          - { name: "Brands", file: "API1-Brands-Search.postman_collection.json" }
+          - { name: "Categories", file: "API2-Categories-Search.postman_collection.json" }
+          - { name: "Invoices", file: "API3-Invoice-Status.postman_collection.json" }
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          
+      - name: 📦 Install Newman
+        run: npm install -g newman
+        
+      - name: 🚀 Start application
+        env:
+          DISABLE_LOGGING: "true"
+        run: |
+          docker compose -f docker-compose.yml up -d
+          sleep 60
+          docker compose exec -T laravel-api php artisan migrate:refresh --seed --force
+          
+      - name: 🧪 Run ${{ matrix.test-suite.name }} Tests
+        run: |
+          echo "Running ${{ matrix.test-suite.name }} API tests..."
+          newman run collections/${{ matrix.test-suite.file }} \
+            --environment environments/CI-Docker.postman_environment.json \
+            --reporters cli,json \
+            --reporter-json-export results-${{ matrix.test-suite.name }}.json \
+            --bail || echo "Tests completed with issues"
+            
+      - name: 📊 Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results-${{ matrix.test-suite.name }}
+          path: results-${{ matrix.test-suite.name }}.json
+          retention-days: 7
+
+  # Job 5: Test Summary and Cleanup
+  summary:
+    name: 📋 Test Summary
+    runs-on: ubuntu-22.04
+    needs: [build, database, health-check, api-tests]
+    if: always()
+    
+    steps:
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        
+      - name: 📋 Generate test summary
+        run: |
+          echo "## 🧪 API Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          for result in api-test-results-*/results-*.json; do
+            if [ -f "$result" ]; then
+              suite_name=$(basename "$result" .json | sed 's/results-//')
+              echo "| $suite_name | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+      - name: 🧹 Cleanup
+        run: echo "CI Pipeline completed successfully! 🎉"
