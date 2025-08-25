@@ -92,7 +92,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/categories/search?q=q=power",
+							"raw": "{{base_url}}/categories/search?q=power",
 							"host": [
 								"{{base_url}}"
 							],
@@ -103,7 +103,7 @@
 							"query": [
 								{
 									"key": "q",
-									"value": "q=power"
+									"value": "power"
 								}
 							]
 						}
