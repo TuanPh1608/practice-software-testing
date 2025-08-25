@@ -75,6 +75,69 @@ jobs:
           echo "🌱 Setting up database with seed data..."
           docker compose exec -T laravel-api php artisan migrate:refresh --seed
 
+      - name: 🔧 Laravel Search APIs Readiness Check
+        run: |
+          echo "🔧 Ensuring Laravel search APIs are fully functional..."
+          
+          # Clear all caches first
+          echo "🧹 Clearing Laravel caches..."
+          docker compose exec -T laravel-api php artisan cache:clear || echo "Cache clear failed"
+          docker compose exec -T laravel-api php artisan config:clear || echo "Config clear failed"
+          docker compose exec -T laravel-api php artisan route:clear || echo "Route clear failed"
+          
+          # Re-cache for optimization
+          echo "⚡ Re-caching Laravel..."
+          docker compose exec -T laravel-api php artisan config:cache || echo "Config cache failed"
+          docker compose exec -T laravel-api php artisan route:cache || echo "Route cache failed"
+          
+          echo "📊 Verifying database connectivity and data..."
+          docker compose exec -T laravel-api php artisan migrate:status || echo "Migration status failed"
+          
+          echo "🔍 Testing search APIs readiness with progressive checks..."
+          max_attempts=20
+          attempt=1
+          search_ready=false
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "🔄 Search API test $attempt/$max_attempts..."
+            
+            # Test brands search endpoint
+            brands_response=$(curl -s -w "%{http_code}" "http://localhost:8091/brands/search?q=test" 2>/dev/null)
+            brands_status="${brands_response: -3}"
+            
+            echo "📊 Brands search status: $brands_status"
+            
+            # Check if we get valid response (200, 422 for validation, or 404 for no results)
+            if [ "$brands_status" = "200" ] || [ "$brands_status" = "422" ] || [ "$brands_status" = "404" ]; then
+              echo "✅ Search APIs are ready! (Status: $brands_status)"
+              search_ready=true
+              break
+            elif [ "$brands_status" = "500" ]; then
+              echo "⚠️ Still getting 500 - Laravel may need more time to initialize..."
+              
+              # Show some debug info every 5 attempts
+              if [ $((attempt % 5)) -eq 0 ]; then
+                echo "🔍 Debug info at attempt $attempt:"
+                docker compose exec -T laravel-api php artisan route:list | grep -E "(brands|categories)" | head -5 || echo "No search routes found"
+                docker compose logs laravel-api --tail=5 2>/dev/null || echo "No recent logs"
+              fi
+            else
+              echo "⏳ Unexpected status: $brands_status - retrying..."
+            fi
+            
+            if [ $attempt -eq $max_attempts ]; then
+              echo "⚠️ Search APIs still not ready after $max_attempts attempts"
+              echo "🔍 Final debugging information:"
+              docker compose exec -T laravel-api php artisan about || echo "Laravel about failed"
+              echo "Continuing with tests anyway..."
+              break
+            fi
+            
+            echo "⏳ Waiting 10 seconds for Laravel search functionality to initialize..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+
       - name: 🔧 Debug Laravel Application
         run: |
           echo "🔧 Debugging Laravel application..."
@@ -120,21 +183,31 @@ jobs:
       - name: 📁 Create Reports Directory
         run: mkdir -p reports
 
-      - name: 🐛 Debug API Endpoints Before Testing
+      - name: 🐛 Deep Laravel Debug Analysis  
         run: |
-          echo "🐛 Testing specific API endpoints that are failing..."
+          echo "🔍 DEEP LARAVEL DEBUGGING - Investigating 500 errors..."
           
-          echo "🔍 Testing /brands/search endpoint:"
-          curl -v -X GET 'http://localhost:8091/brands/search?q=test' || echo "Brands search failed"
+          echo "� Laravel Error Logs (Last 100 lines):"
+          docker compose exec -T laravel-api tail -100 /var/www/storage/logs/laravel.log || echo "No Laravel logs"
           
-          echo -e "\n🔍 Testing /categories/search endpoint:"
-          curl -v -X GET 'http://localhost:8091/categories/search?q=tool' || echo "Categories search failed"
+          echo -e "\n🌐 Nginx Error Logs:"
+          docker compose logs web 2>&1 | tail -20 || echo "No Nginx logs"
           
-          echo -e "\n📋 Laravel Error Logs:"
-          docker compose exec -T laravel-api tail -50 /var/www/storage/logs/laravel.log || echo "No error logs found"
+          echo -e "\n🗂️ All Laravel Routes:"
+          docker compose exec -T laravel-api php artisan route:list || echo "Route list failed"
           
-          echo -e "\n🗂️ Check Laravel routes:"
-          docker compose exec -T laravel-api php artisan route:list | grep -E "(brands|categories)" || echo "Routes not found"
+          echo -e "\n🔍 Testing search endpoints with verbose output:"
+          echo "=== BRANDS SEARCH TEST ==="
+          curl -i -X GET 'http://localhost:8091/brands/search?q=test' 2>&1 | head -50
+          
+          echo -e "\n=== CATEGORIES SEARCH TEST ==="  
+          curl -i -X GET 'http://localhost:8091/categories/search?q=tool' 2>&1 | head -50
+          
+          echo -e "\n� Laravel Environment Check:"
+          docker compose exec -T laravel-api php artisan about || echo "Laravel about failed"
+          
+          echo -e "\n� Laravel Configuration:"
+          docker compose exec -T laravel-api php artisan config:show database || echo "DB config failed"
         continue-on-error: true
 
       - name: 🔐 Run Authentication API Tests
