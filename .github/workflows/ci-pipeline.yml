@@ -2,9 +2,9 @@ name: CI/CD Pipeline 🚀
 
 on:
   push:
-    branches: [ test-api-workflow, main ]
+    branches: [test-api-workflow, main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -17,15 +17,15 @@ jobs:
   ci-pipeline:
     name: 🚀 Complete CI/CD Pipeline
     runs-on: ubuntu-22.04
-    
+
     steps:
       # Stage 1: Setup
       - name: 📥 Checkout code
         uses: actions/checkout@v4
-        
+
       - name: 🐳 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        
+
       # Stage 2: Build Once
       - name: 🏗️ Build application stack
         env:
@@ -33,64 +33,64 @@ jobs:
         run: |
           echo "Building application for ${{ env.SPRINT }}"
           docker compose -f docker-compose.yml build --no-cache
-          
+
       - name: 🚀 Start application stack
         env:
           DISABLE_LOGGING: "true"
         run: |
           docker compose -f docker-compose.yml up -d
-          
+
       - name: ⏳ Wait for services startup
         run: |
           echo "Waiting for services to be ready..."
           sleep 60
-          
-      # Stage 3: Database Setup (following official docs)          
+
+      # Stage 3: Database Setup (following official docs)
       - name: ️ Setup database (migrate fresh + seed)
         run: |
           echo "Running fresh migration with seed (following official docs)..."
           docker compose exec -T laravel-api php artisan migrate:fresh --seed
-          
+
       - name: ✅ Verify database setup
         run: |
           echo "Verifying database status..."
           docker compose exec -T laravel-api php artisan migrate:status
-          
+
       # Stage 4: Health Check & Debugging
       - name: 🔍 Debug API container status
         run: |
           echo "=== Container Status ==="
           docker compose ps
-          
+
           echo "=== Laravel API Logs ==="
           docker compose logs laravel-api --tail=20
-          
+
       - name: 🩺 API health checks
         run: |
           echo "=== Health Check: API Status ==="
           curl -v http://localhost:8091/status || echo "Status endpoint failed"
-          
+
           echo "=== Health Check: Detailed Response ==="
           curl -i http://localhost:8091/products || echo "Products endpoint response logged"
-          
+
           echo "=== Check Laravel Routes ==="
           docker compose exec -T laravel-api php artisan route:list | grep -E "(login|products|brands|categories)" || echo "Routes listed"
-          
+
       # Stage 5: Setup Newman
       - name: ⚙️ Setup Node.js & Newman
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          
+          node-version: "22"
+
       - name: 📦 Install Newman
         run: npm install -g newman
-        
+
       # Stage 6: API Tests with Enhanced Debugging
       - name: 🧪 Run Authentication Tests
         run: |
           echo "=== Pre-test: Check Laravel Logs ==="
           docker compose logs laravel-api --tail=10
-          
+
           echo "Running Authentication API tests..."
           newman run collections/Authentication.postman_collection.json \
             --environment environments/CI-Docker.postman_environment.json \
@@ -100,7 +100,7 @@ jobs:
             
           echo "=== Post-test: Check Laravel Logs ==="
           docker compose logs laravel-api --tail=10
-            
+
       - name: 🧪 Run Brands Tests
         run: |
           echo "Running Brands API tests..."
@@ -109,7 +109,7 @@ jobs:
             --reporters cli,json \
             --reporter-json-export results-Brands.json \
             --verbose || echo "Brands tests completed with issues"
-            
+
       - name: 🧪 Run Categories Tests
         run: |
           echo "Running Categories API tests..."
@@ -118,7 +118,7 @@ jobs:
             --reporters cli,json \
             --reporter-json-export results-Categories.json \
             --verbose || echo "Categories tests completed with issues"
-            
+
       - name: 🧪 Run Invoice Tests
         run: |
           echo "Running Invoice API tests..."
@@ -127,7 +127,7 @@ jobs:
             --reporters cli,json \
             --reporter-json-export results-Invoices.json \
             --verbose || echo "Invoice tests completed with issues"
-            
+
       # Stage 7: Results & Cleanup
       - name: 📊 Upload all test results
         uses: actions/upload-artifact@v4
@@ -136,21 +136,21 @@ jobs:
           name: api-test-results-complete
           path: results-*.json
           retention-days: 7
-          
+
       - name: 📋 Generate test summary
         if: always()
         run: |
           echo "## 🧪 API Test Results Summary" >> $GITHUB_STEP_SUMMARY
           echo "| Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
-          
+
           for result in results-*.json; do
             if [ -f "$result" ]; then
               suite_name=$(basename "$result" .json | sed 's/results-//')
               echo "| $suite_name | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
             fi
           done
-          
+
       - name: 🧹 Cleanup
         if: always()
         run: |
