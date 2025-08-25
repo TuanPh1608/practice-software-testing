@@ -47,7 +47,6 @@ jobs:
 
       - name: Install Newman dependencies ⚙️
         run: |
-          npm ci
           npm install -g newman
           mkdir -p newman-results
 
