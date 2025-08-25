@@ -45,35 +45,16 @@ jobs:
           echo "Waiting for services to be ready..."
           sleep 60
           
-      # Stage 3: Laravel Configuration & Database Setup
-      - name: 🔧 Configure Laravel
+      # Stage 3: Database Setup (following official docs)          
+      - name: ️ Setup database (migrate fresh + seed)
         run: |
-          echo "Clearing Laravel caches..."
-          docker compose exec -T laravel-api php artisan config:clear
-          docker compose exec -T laravel-api php artisan cache:clear
-          docker compose exec -T laravel-api php artisan route:clear
-          docker compose exec -T laravel-api php artisan view:clear
-          
-      - name: 🔗 Test database connection
-        run: |
-          echo "Testing database connection..."
-          docker compose exec -T laravel-api php artisan migrate:status || echo "Database not ready yet"
-          
-      - name: ️ Setup database
-        run: |
-          echo "Running database migrations..."
-          docker compose exec -T laravel-api php artisan migrate:refresh --seed --force
+          echo "Running fresh migration with seed (following official docs)..."
+          docker compose exec -T laravel-api php artisan migrate:fresh --seed
           
       - name: ✅ Verify database setup
         run: |
           echo "Verifying database status..."
           docker compose exec -T laravel-api php artisan migrate:status
-          
-      - name: 🔧 Cache Laravel configuration
-        run: |
-          echo "Caching Laravel configuration..."
-          docker compose exec -T laravel-api php artisan config:cache
-          docker compose exec -T laravel-api php artisan route:cache
           
       # Stage 4: Health Check & Debugging
       - name: 🔍 Debug API container status
