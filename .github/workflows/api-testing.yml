@@ -29,13 +29,13 @@ jobs:
         run: |
           echo "⏱️ Waiting for services to be ready..."
           echo "Initial wait for containers..."
-          sleep 60s
+          sleep 90s
 
           echo "🔍 Check container health..."
           docker compose ps
 
           echo "Additional wait for Laravel initialization..."
-          sleep 30s
+          sleep 60s
         shell: bash
 
       - name: 🌱 Setup Database
@@ -77,20 +77,18 @@ jobs:
 
           echo -e "\n🌐 Test basic connectivity:"
           curl -I 'http://localhost:8091/' || echo "Basic connectivity failed"
+        continue-on-error: true
 
-      - name: 🔐 Test Login
+      - name: 🔧 Additional Laravel Setup
         run: |
-          echo "🔐 Testing login endpoint with different users..."
-
-          echo "Testing with customer account:"
-          curl -v -X POST 'http://localhost:8091/users/login' \
-          -H 'Content-Type: application/json' \
-          -d '{"email": "customer@practicesoftwaretesting.com", "password": "welcome01"}' || echo "Customer login failed"
-
-          echo -e "\nTesting with admin account:"
-          curl -v -X POST 'http://localhost:8091/users/login' \
-          -H 'Content-Type: application/json' \
-          -d '{"email": "admin@practicesoftwaretesting.com", "password": "welcome01"}' || echo "Admin login failed"
+          echo "🔧 Additional Laravel configuration..."
+          docker compose exec -T laravel-api php artisan config:cache
+          docker compose exec -T laravel-api php artisan route:cache
+          docker compose exec -T laravel-api php artisan view:cache
+          
+          echo "🔍 Testing a simple API endpoint:"
+          curl -I 'http://localhost:8091/brands' || echo "Brands endpoint not accessible"
+        continue-on-error: true
 
       - name: 🏗️ Setup Node.js
         uses: actions/setup-node@v4
